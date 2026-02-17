@@ -1,0 +1,21 @@
+{
+  "name": "tiny",
+  "version": "0.1.0",
+  "description": "A Koa-like HTTP server wrapper on top of node:http",
+  "keywords": ["http", "node", "koa", "router", "middleware"],
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.mjs"
+  },
+  "files": ["src"],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "vitest": "^2.0.0"
+  }
+}
