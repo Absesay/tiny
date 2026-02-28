@@ -1,17 +1,21 @@
-// A method to compose middleware
-export function compose(middlewares) {
+// ---------------------------
+// Middleware composer
+// ---------------------------
+
+function compose(middlewares) {
   return function run(ctx) {
-    let index = -1;
-    return dispatch(0);
+      let index = -1;
 
-    function dispatch(i) {
-      if (i <= index) return Promise.reject(new Error("next() called multiple times"));
-      index = i;
+      async function dispatch(i) {
+          if (i <= index) throw new Error("next() called multiple times");
+          index = i;
 
-      const fn = middlewares[i];
-      if (!fn) return Promise.resolve();
+          const fn = middlewares[i];
+          if (!fn) return;
 
-      return Promise.resolve(fn(ctx, () => dispatch(i + 1)));
-    }
+          await fn(ctx, () => dispatch(i + 1));
+      }
+
+      return dispatch(0);
   };
 }

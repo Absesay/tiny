@@ -1,99 +1,76 @@
-// A method to create the shared context
-import { URL } from "node:url";
+// ---------------------------
+// Context
+// ---------------------------
 
-export function createContext(req, res) {
-  const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
-
+function createContext(app, req, res) {
   const ctx = {
-    req,
-    res,
+      app,
+      req,
+      res,
 
-    url,
-    method: req.method ?? "GET",
-    path: url.pathname,
-    query: Object.fromEntries(url.searchParams.entries()),
+      // request-derived (set by router if used)
+      method: (req.method || "GET").toUpperCase(),
+      url: undefined,
+      path: undefined,
+      query: undefined,
 
-    params: {},
-    state: {},
+      // userland - get user info / state
+      state: {},
+      body: undefined,
 
-    // request "namespace" (handy place for middleware to attach parsed data)
-    request: {
-      body: undefined
-    },
+      // response state
+      status: {},
 
-    // response helpers
-    status(code) {
-      res.statusCode = code;
-      return ctx;
-    },
+      set(name, value) {
+          res.setHeader(name, value);
+      },
 
-    set(name, value) {
-      res.setHeader(name, value);
-      return ctx;
-    },
+      text(str) {
+          if (res.writableEnded) return;
+          if (!res.getHeader("content-type")) {
+              res.setHeader("content-type", "text/plain; charset=utf-8");
+          }
+          res.statusCode = ctx.status || res.statusCode || 200;
+          res.end(String(str));
+      },
 
-    get(name) {
-      // Node lowercases incoming headers keys in req.headers
-      return req.headers[String(name).toLowerCase()];
-    },
+      json(obj) {
+          if (res.writableEnded) return;
+          if (!res.getHeader("content-type")) {
+              res.setHeader("content-type", "application/json; charset-utf-8");
+          }
+          res.statusCode = ctx.status || res.statusCode || 200;
+          res.end(JSON.stringify(obj));
+      },
 
-    text(str) {
-      if (!res.getHeader("content-type")) ctx.set("content-type", "text/plain; charset=utf-8");
-      res.end(str);
-    },
+      send(value) {
+          if (res.writableEnded) return;
 
-    json(data) {
-      if (!res.getHeader("content-type")) ctx.set("content-type", "application/json; charset=utf-8");
-      res.end(JSON.stringify(data));
-    },
+          // Allow Buffer
+          if (Buffer.isBuffer(value)) {
+              res.statusCode = ctx.status || res.statusCode || 200;
+              res.end(value);
+              return;
+          }
 
-    send(body) {
-      if (body == null) return res.end();
-      if (Buffer.isBuffer(body)) return res.end(body);
-      if (typeof body === "string") return res.end(body);
-      return ctx.json(body);
-    },
+          // Strings to text
+          if (typeof value === "string") {
+              ctx.text(value);
+              return;
+          }
 
-    // lazy body readers
-    async bodyBuffer({ limit = 1_000_000 } = {}) {
-      return readStream(req, { limit });
-    },
+          // Everything else to JSON
+          ctx.json(value);
+      },
 
-    async bodyText(opts) {
-      const buf = await ctx.bodyBuffer(opts);
-      return buf.toString("utf8");
-    },
+      throw(statusCode, message = "Error") {
+          const err = new Error(message);
+          err.statusCode = statusCode;
+          throw err;
+      },
 
-    async bodyJson(opts) {
-      const txt = await ctx.bodyText(opts);
-      return JSON.parse(txt);
-    }
+      _matchedRoute: false,
   };
 
   return ctx;
-}
-
-function readStream(stream, { limit }) {
-  return new Promise((resolve, reject) => {
-    const chunks = [];
-    let size = 0;
-
-    stream.on("data", (chunk) => {
-      size += chunk.length;
-
-      if (size > limit) {
-        const err = new Error("Body too large");
-        err.code = "BODY_TOO_LARGE";
-        // destroy emits 'error' in many cases; also reject now for safety
-        stream.destroy(err);
-        reject(err);
-        return;
-      }
-
-      chunks.push(chunk);
-    });
-
-    stream.on("end", () => resolve(Buffer.concat(chunks)));
-    stream.on("error", reject);
-  });
 }
