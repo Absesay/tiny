@@ -5,19 +5,17 @@ A Koa-like middleware server built on top of `node:http`.
 ## Usage
 
 ```js
-import { createApp, logger, jsonBody } from "tiny";
+import Tiny from "tiny";
 
-const app = createApp();
+const app = Tiny();
 
-app.use(logger());
-app.use(jsonBody());
+app
+  .use(Tiny.errors())
+  .use(Tiny.logger())
+  .use(Tiny.json())
+  .use(Tiny.router());
 
-app.router.get("/health", (ctx) => ctx.text("ok"));
+app.get("/", (ctx) => ({ ok: true }));
+app.post("/echo", (ctx) => ({ body: ctx.body }));
 
-app.router.post("/echo", (ctx) => {
-  ctx.json({ got: ctx.request.body });
-});
-
-app.use(app.router.routes());
-
-app.listen(3000);
+app.listen(3000, () => console.log("Listening on 3000"));
